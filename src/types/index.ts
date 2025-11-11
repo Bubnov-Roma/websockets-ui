@@ -175,8 +175,8 @@ export type Player = {
   readonly name: string;
   readonly password: string;
   readonly index: number;
-  readonly wins: number;
-  readonly socket: WebSocket;
+  wins: number;
+  socket: WebSocket;
 }
 
 export type RoomUser = {
@@ -191,7 +191,7 @@ export type Room = {
 
 export type GamePlayer = {
   readonly socket: WebSocket;
-  readonly ships: Ship[];
+  ships: Ship[];
   readonly board: number[][];
   readonly attacks: Set<string>;
 }
@@ -199,6 +199,6 @@ export type GamePlayer = {
 export type Game = {
   readonly idGame: number;
   readonly players: Map<number, GamePlayer>;
-  readonly currentPlayer: number;
+  currentPlayer: number;
   readonly playerIds: number[];
 }
