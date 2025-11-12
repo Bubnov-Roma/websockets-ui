@@ -56,6 +56,13 @@ export type UpdateRoomResponse = {
   readonly id: 0;
 }
 
+export type SinglePlayRequest = {
+  readonly type: 'single_play';
+  readonly data: '';
+  readonly id: 0;
+}
+
+
 // Ships
 export type Ship = {
   readonly position: {
@@ -159,7 +166,8 @@ export type WSRequest =
   | AddUserToRoomRequest
   | AddShipsRequest
   | AttackRequest
-  | RandomAttackRequest;
+  | RandomAttackRequest
+  | SinglePlayRequest;
 
 export type WSResponse =
   | RegResponse

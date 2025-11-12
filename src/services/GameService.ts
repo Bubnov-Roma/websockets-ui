@@ -1,6 +1,7 @@
 import { IGameService } from '../interfaces';
 import { Game, Room, Ship } from '../types';
 import { PlayerService } from './PlayerService';
+import { WebSocket } from 'ws';
 
 export class GameService implements IGameService {
   private games: Map<number, Game> = new Map();
@@ -31,6 +32,35 @@ export class GameService implements IGameService {
 
     game.currentPlayer = game.playerIds[Math.floor(Math.random() * game.playerIds.length)];
     
+    this.games.set(game.idGame, game);
+    return game;
+  }
+
+  createSinglePlayerGame(playerIndex: number): Game {
+    const game: Game = {
+      idGame: this.gameIdCounter++,
+      players: new Map(),
+      currentPlayer: playerIndex,
+      playerIds: [playerIndex, -1] 
+    };
+
+    const player = this.playerService.getPlayerByIndex(playerIndex);
+    if (player && player.socket) {
+      game.players.set(playerIndex, {
+        socket: player.socket,
+        ships: [],
+        board: this.createEmptyBoard(),
+        attacks: new Set()
+      });
+    
+      game.players.set(-1, {
+        socket: {} as WebSocket,
+        ships: [],
+        board: this.createEmptyBoard(),
+        attacks: new Set()
+      });
+    }
+
     this.games.set(game.idGame, game);
     return game;
   }

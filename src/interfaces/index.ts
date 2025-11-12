@@ -11,7 +11,7 @@ export interface IPlayerService {
 }
 
 export interface IRoomService {
-  createRoom(playerIndex: number): Room;
+  createRoom(playerIndex: number, playerName?: string): Room;
   addUserToRoom(roomId: number, playerIndex: number): void;
   removePlayerFromRooms(playerIndex: number): void;
   getAllRooms(): Room[];
@@ -31,6 +31,7 @@ export interface IGameService {
   removeGame(gameId: number): void;
   isGameReady(gameId: number): boolean;
   isShipKilled(ship: Ship, attacks: Set<string>): boolean;
+  createSinglePlayerGame(playerIndex: number): Game;
 }
 
 export interface IWinnerService {
