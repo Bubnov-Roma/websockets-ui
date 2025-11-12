@@ -8,7 +8,7 @@ const HTTP_PORT = 8181;
 const WS_PORT = 3000;
 
 const playerService = new PlayerService();
-const roomService = new RoomService();
+const roomService = new RoomService(playerService);
 const gameService = new GameService(playerService);
 const winnerService = new WinnerService();
 const notificationService = new NotificationService(
