@@ -5,6 +5,7 @@ import { WebSocket } from 'ws';
 export class PlayerService implements IPlayerService {
   private players: Map<string, Player> = new Map();
   private playersByIndex: Map<number, Player> = new Map();
+  private playersBySocket: Map<WebSocket, Player> = new Map();
   private playerIndexCounter = 1;
 
   registerPlayer(name: string, password: string, socket: WebSocket): Player {
@@ -15,6 +16,7 @@ export class PlayerService implements IPlayerService {
         throw new Error('Invalid password');
       }
       existingPlayer.socket = socket;
+      this.playersBySocket.set(socket, existingPlayer);
       return existingPlayer;
     }
     
@@ -25,9 +27,10 @@ export class PlayerService implements IPlayerService {
       wins: 0,
       socket
     };
-    
+
     this.players.set(name, newPlayer);
     this.playersByIndex.set(newPlayer.index, newPlayer);
+    this.playersBySocket.set(socket, newPlayer);
     
     return newPlayer;
   }
@@ -41,7 +44,7 @@ export class PlayerService implements IPlayerService {
   }
 
   getPlayerBySocket(socket: WebSocket): Player | undefined {
-    return Array.from(this.players.values()).find(p => p.socket === socket);
+    return this.playersBySocket.get(socket);
   }
 
   getAllPlayers(): Player[] {
@@ -53,6 +56,7 @@ export class PlayerService implements IPlayerService {
     if (player) {
       this.players.delete(player.name);
       this.playersByIndex.delete(playerIndex);
+      this.playersBySocket.delete(player.socket);
     }
   }
 

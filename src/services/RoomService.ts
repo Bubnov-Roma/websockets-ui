@@ -1,17 +1,22 @@
-import { IRoomService } from '../interfaces';
+import { IPlayerService, IRoomService } from '../interfaces';
 import { Room } from '../types';
 
 export class RoomService implements IRoomService {
   private rooms: Room[] = [];
   private roomIdCounter = 1;
 
-  createRoom(playerIndex: number): Room {
+  constructor(private playerService: IPlayerService) {}
+
+  createRoom(playerIndex: number, playerName?: string): Room {
     this.removePlayerFromRooms(playerIndex);
+
+    const player = this.playerService.getPlayerByIndex(playerIndex);
+    const name = player?.name || playerName || `Player${playerIndex}`;
     
     const newRoom: Room = {
       roomId: this.roomIdCounter++,
       roomUsers: [{
-        name: `Player${playerIndex}`,
+        name: name,
         index: playerIndex
       }]
     };
@@ -30,8 +35,9 @@ export class RoomService implements IRoomService {
       throw new Error('Room is full');
     }
     
+    const player = this.playerService.getPlayerByIndex(playerIndex);
     room.roomUsers.push({
-      name: `Player${playerIndex}`,
+      name: player?.name || `Player${playerIndex}`,
       index: playerIndex
     });
   }

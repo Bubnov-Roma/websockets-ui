@@ -10,9 +10,16 @@ export class NotificationService implements INotificationService {
 
   updateRooms(): void {
     const roomsData = this.roomService.getAllRooms();
+    const formattedRooms = roomsData.map(room => ({
+    roomId: room.roomId,
+    roomUsers: room.roomUsers.map(user => ({
+        name: user.name,
+        index: user.index
+      }))
+    }));
     const message = {
       type: 'update_room',
-      data: JSON.stringify(roomsData),
+      data: JSON.stringify(formattedRooms),
       id: 0
     };
     
