@@ -1,5 +1,5 @@
-import { INotificationService, IPlayerService, IRoomService, IWinnerService } from '../interfaces/index.js';
-import { WSMessage } from '../types/index.js';
+import { INotificationService, IPlayerService, IRoomService, IWinnerService } from '../interfaces';
+import { WSMessage } from '../types';
 
 export class NotificationService implements INotificationService {
   constructor(

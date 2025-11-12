@@ -1,6 +1,6 @@
 import { IGameService } from '../interfaces';
-import { Game, GamePlayer, Room, Ship } from '../types';
-import { PlayerService } from './PlayerService.js';
+import { Game, Room, Ship } from '../types';
+import { PlayerService } from './PlayerService';
 
 export class GameService implements IGameService {
   private games: Map<number, Game> = new Map();
@@ -187,7 +187,7 @@ export class GameService implements IGameService {
     return false;
   }
 
-  private isShipKilled(ship: Ship, attacks: Set<string>): boolean {
+  isShipKilled(ship: Ship, attacks: Set<string>): boolean {
     const { position, direction, length } = ship;
     
     for (let i = 0; i < length; i++) {

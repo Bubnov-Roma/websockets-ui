@@ -1,5 +1,6 @@
 import { IPlayerService } from '../interfaces';
 import { Player } from '../types';
+import { WebSocket } from 'ws';
 
 export class PlayerService implements IPlayerService {
   private players: Map<string, Player> = new Map();

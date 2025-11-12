@@ -1,4 +1,5 @@
 import { Game, Player, Room, Ship, WSRequest } from "../types";
+import { WebSocket } from 'ws';
 
 export interface IPlayerService {
   registerPlayer(name: string, password: string, socket: WebSocket): Player;
@@ -15,15 +16,21 @@ export interface IRoomService {
   removePlayerFromRooms(playerIndex: number): void;
   getAllRooms(): Room[];
   getRoomById(roomId: number): Room | undefined;
+  removeRoom(roomId: number): void;
 }
 
 export interface IGameService {
   createGame(room: Room): Game;
   addShips(gameId: number, playerIndex: number, ships: Ship[]): void;
-  attack(gameId: number, attackerIndex: number, x: number, y: number): void;
-  randomAttack(gameId: number, attackerIndex: number): void;
+  attack(gameId: number, attackerIndex: number, x: number, y: number): {
+    status: "miss" | "shot" | "killed";
+    nextPlayer?: number | undefined;
+  };
+  randomAttack(gameId: number, attackerIndex: number): { x: number; y: number } ;
   getGameById(gameId: number): Game | undefined;
   removeGame(gameId: number): void;
+  isGameReady(gameId: number): boolean;
+  isShipKilled(ship: Ship, attacks: Set<string>): boolean;
 }
 
 export interface IWinnerService {

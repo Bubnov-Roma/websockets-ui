@@ -1,3 +1,4 @@
+import { WebSocket } from 'ws';
 // Registrations
 export type RegRequest = {
   readonly type: 'reg';
@@ -27,7 +28,7 @@ export type CreateRoomRequest = {
 }
 
 export type AddUserToRoomRequest = {
-  readonly type: 'add_user_to__room';
+  readonly type: 'add_user_to_room';
   readonly data: {
     indexRoom: number;
   }
@@ -46,7 +47,7 @@ export type CreateGameResponse = {
 export type UpdateRoomResponse = {
   readonly type: 'update_room';
   readonly data: Array<{
-    readonly roomID: number;
+    readonly roomId: number;
     readonly roomUsers: Array<{
       name: string;
       index: number;
@@ -70,7 +71,7 @@ export type AddShipsRequest = {
   readonly type: 'add_ships';
   readonly data: {
     gameId: number;
-    ship: Ship[];
+    ships: Ship[];
     indexPlayer: number;
   };
   readonly id: 0;
@@ -89,10 +90,10 @@ export type StartGameResponse = {
 export type AttackRequest = {
   readonly type: 'attack';
   readonly data: {
-  readonly gameId: number;
-    x: number;
-    y: number;
-    indexPlayer: number;
+    readonly gameId: number;
+      x: number;
+      y: number;
+      indexPlayer: number;
   };
   readonly id: 0;
 }
