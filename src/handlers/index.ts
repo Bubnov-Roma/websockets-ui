@@ -31,10 +31,13 @@ export class MessageHandler implements IMessageHandler {
           break;
         case 'randomAttack':
           this.handleRandomAttack(ws, message);
+          break;
+        case 'single_play':
+          this.handleSinglePlay(ws);
+          break;
         default:
-          this.sendError(ws, `Unknown command type: ${message.type}`);
+          this.sendError(ws, `Unknown command type: ${message}`);
       }
-      
     } catch (error) {
       console.error('Error handling message:', error);
       this.sendError(ws, error instanceof Error ? error.message : 'Unknown error');
@@ -42,8 +45,15 @@ export class MessageHandler implements IMessageHandler {
   }
 
   private handleRegistration(ws: WebSocket, message: RegRequest): void {
-    const {name, password} = message.data;
+    
     try {
+      const requestData = typeof message.data === 'string' 
+      ? JSON.parse(message.data) 
+      : message.data;
+      const {name, password} = requestData;
+      if (!name || !password) {
+        throw new Error('Name and password are required');
+      }
       const player = this.playerService.registerPlayer(name, password, ws);
       this.sendResponse(ws, 'reg', {
         name: player.name,
@@ -69,8 +79,12 @@ export class MessageHandler implements IMessageHandler {
       this.sendError(ws, 'Player not registered');
       return;
     }
-    this.roomService.createRoom(player.index);
+    try {
+    this.roomService.createRoom(player.index, player.name);
     this.notificationService.updateRooms();
+    } catch (error) {
+      this.sendError(ws, error instanceof Error ? error.message : 'Failed to create room');
+    }
   }
 
   private handleAddUserToRoom(ws: WebSocket, message: AddUserToRoomRequest): void {
@@ -79,13 +93,28 @@ export class MessageHandler implements IMessageHandler {
       this.sendError(ws, 'Player not registered');
       return;
     }
-    const {indexRoom} = message.data;
+    const requestData = typeof message.data === 'string' 
+      ? JSON.parse(message.data) 
+      : message.data;
+  
+    const indexRoom = requestData.indexRoom;
+  
+    if (!indexRoom) {
+      this.sendError(ws, 'Room ID is required');
+      return;
+    }
     try {
-      this.roomService.addUserToRoom(indexRoom, player.index);
       const room = this.roomService.getRoomById(indexRoom);
-      if (room && room.roomUsers.length === 2) {
+      if (!room) {
+        throw new Error('Room not found');
+      }
+      
+      this.roomService.addUserToRoom(indexRoom, player.index);
+      this.notificationService.updateRooms();
+      const updatedRoom = this.roomService.getRoomById(indexRoom);
+      if (updatedRoom && updatedRoom.roomUsers.length === 2) {
         const game = this.gameService.createGame(room);
-        room.roomUsers.forEach(user => {
+        updatedRoom.roomUsers.forEach(user => {
           this.notificationService.sendToPlayer(user.index, {
             type: 'create_game',
             data: JSON.stringify({
@@ -99,12 +128,18 @@ export class MessageHandler implements IMessageHandler {
         this.notificationService.updateRooms();
       }
     } catch (error) {
+      console.error('Error adding user to room:', error);
       this.sendError(ws, error instanceof Error ? error.message : 'Failed to join room');
     }
   }
 
   private handleAddShips(ws: WebSocket, message: AddShipsRequest): void {
-    const {gameId, ships, indexPlayer} = message.data;
+  
+  const requestData = typeof message.data === 'string' 
+    ? JSON.parse(message.data) 
+    : message.data;
+
+    const {gameId, ships, indexPlayer} = requestData;
     try {
       this.gameService.addShips(gameId, indexPlayer, ships);
       const game = this.gameService.getGameById(gameId);
@@ -135,6 +170,22 @@ export class MessageHandler implements IMessageHandler {
     } catch (error) {
       this.sendError(ws, error instanceof Error ? error.message : 'Failed to add ships');
     }
+  }
+
+  private handleSinglePlay(ws: WebSocket): void {
+    const player = this.playerService.getPlayerBySocket(ws);
+
+    if(!player) {
+      this.sendError(ws, 'Player not registered');
+      return;
+    }
+    
+    const game = this.gameService.createSinglePlayerGame(player.index);
+
+    this.sendResponse(ws, 'create_game', {
+      idGame: game.idGame,
+      idPlayer: player.index
+    })
   }
 
   private handleAttack(ws: WebSocket, message: AttackRequest): void {
