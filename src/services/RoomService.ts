@@ -34,7 +34,12 @@ export class RoomService implements IRoomService {
     if (room.roomUsers.length >= 2) {
       throw new Error('Room is full');
     }
-    
+
+    const isAlreadyInRoom = room.roomUsers.some(user => user.index === playerIndex);
+    if (isAlreadyInRoom) {
+      throw new Error('Player is already in this room');
+    }
+
     const player = this.playerService.getPlayerByIndex(playerIndex);
     room.roomUsers.push({
       name: player?.name || `Player${playerIndex}`,
@@ -55,6 +60,12 @@ export class RoomService implements IRoomService {
         }
       }
     }
+  }
+
+  getPlayerRoom(playerIndex: number): Room | undefined {
+    return this.rooms.find(room => 
+      room.roomUsers.some(user => user.index === playerIndex)
+    );
   }
 
   getAllRooms(): Room[] {

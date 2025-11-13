@@ -92,6 +92,7 @@ export class MessageHandler implements IMessageHandler {
       this.sendError(ws, 'Player not registered');
       return;
     }
+
     const requestData = typeof message.data === 'string' 
       ? JSON.parse(message.data) 
       : message.data;
@@ -102,14 +103,27 @@ export class MessageHandler implements IMessageHandler {
       this.sendError(ws, 'Room ID is required');
       return;
     }
+
     try {
       const room = this.roomService.getRoomById(indexRoom);
+
       if (!room) {
         throw new Error('Room not found');
       }
-      
+
+      const isRoomCreator = room.roomUsers.some(user => user.index === player.index);
+      if (isRoomCreator) {
+        throw new Error('You cannot join your own room');
+      }
+
+      const currentPlayerRoom = this.roomService.getPlayerRoom(player.index);
+      if (currentPlayerRoom) {
+        this.roomService.removePlayerFromRooms(player.index);
+      }
+
       this.roomService.addUserToRoom(indexRoom, player.index);
       this.notificationService.updateRooms();
+
       const updatedRoom = this.roomService.getRoomById(indexRoom);
       if (updatedRoom && updatedRoom.roomUsers.length === 2) {
         const game = this.gameService.createGame(room);
@@ -127,6 +141,7 @@ export class MessageHandler implements IMessageHandler {
         this.notificationService.updateRooms();
       }
     } catch (error) {
+      console.error('Error adding user to room:', error);
       this.sendError(ws, error instanceof Error ? error.message : 'Failed to join room');
     }
   }

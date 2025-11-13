@@ -17,6 +17,7 @@ export interface IRoomService {
   getAllRooms(): Room[];
   getRoomById(roomId: number): Room | undefined;
   removeRoom(roomId: number): void;
+  getPlayerRoom(playerIndex: number): Room | undefined
 }
 
 export interface IGameService {
