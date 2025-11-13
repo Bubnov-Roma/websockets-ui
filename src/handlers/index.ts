@@ -334,24 +334,9 @@ export class MessageHandler implements IMessageHandler {
           }
         });
 
-        if (result.nextPlayer !== undefined) {
-          game.playerIds.forEach(playerId => {              
-            if (playerId !== -1) {
-              this.notificationService.sendToPlayer(playerId, {
-                type: 'turn',
-                data: JSON.stringify({
-                  currentPlayer: result.nextPlayer
-                }),
-                id: 0
-              });
-            }
-          });
-          if (result.nextPlayer === -1) {
-            this.makeBotMove(gameId);
-          }
-        }
-
         const opponentId = game.playerIds.find(id => id !== indexPlayer);
+        let gameFinished = false;
+
         if (opponentId) {
           const opponent = game.players.get(opponentId);
           if (opponent && opponent.ships.every(ship => this.gameService['isShipKilled'](ship, opponent.attacks))) {
@@ -370,10 +355,29 @@ export class MessageHandler implements IMessageHandler {
               }
             });
             this.gameService.removeGame(gameId);
+            gameFinished = true;
           }
-        } 
+        }
+
+        if (!gameFinished && result.nextPlayer !== undefined) {
+          game.playerIds.forEach(playerId => {              
+            if (playerId !== -1) {
+              this.notificationService.sendToPlayer(playerId, {
+                type: 'turn',
+                data: JSON.stringify({
+                  currentPlayer: result.nextPlayer
+                }),
+                id: 0
+              });
+            }
+          });
+          if (result.nextPlayer === -1) {
+            this.makeBotMove(gameId);
+          }
+        }
       }
     } catch (error) {
+      console.error('Attack error:', error);
       if (indexPlayer !== -1) {
         this.sendError(ws, error instanceof Error ? error.message : 'Attack failed');
       }

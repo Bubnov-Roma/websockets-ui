@@ -120,18 +120,20 @@ export class GameService implements IGameService {
     }
     
     let nextPlayer: number | undefined;
-    if (status === 'miss') {
-      game.currentPlayer = opponentId;
-      nextPlayer = opponentId;
-    }
 
     const allShipsKilled = opponent.ships.every(ship => 
       this.isShipKilled(ship, opponent.attacks)
     );
-    
+
     if (allShipsKilled) {
-      this.removeGame(gameId);
-      return { status, nextPlayer };
+      return { status, nextPlayer: undefined };
+    }
+
+    if (status === 'miss') {
+      game.currentPlayer = opponentId;
+      nextPlayer = opponentId;
+    } else {
+      nextPlayer = opponentId;
     }
     
     return { status, nextPlayer };
@@ -229,7 +231,7 @@ export class GameService implements IGameService {
         return false;
       }
     }
-    
+
     return true;
   }
 
