@@ -108,7 +108,9 @@ export type AttackRequest = {
 export type RandomAttackRequest = {
   readonly type: 'randomAttack';
   readonly data: {
-    gameId: number;
+    readonly gameId: number;
+    x: number;
+    y: number;
     indexPlayer: number;
   };
   readonly id: 0;

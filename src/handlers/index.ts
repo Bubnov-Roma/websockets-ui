@@ -1,5 +1,5 @@
 import { IGameService, IMessageHandler, INotificationService, IPlayerService, IRoomService, IWinnerService } from "../interfaces";
-import { AddShipsRequest, AddUserToRoomRequest, AttackRequest, RandomAttackRequest, RegRequest, WSRequest } from "../types";
+import { AddShipsRequest, AddUserToRoomRequest, AttackRequest, RandomAttackRequest, RegRequest, Ship, WSRequest } from "../types";
 import { WebSocket } from 'ws';
 
 export class MessageHandler implements IMessageHandler {
@@ -39,7 +39,6 @@ export class MessageHandler implements IMessageHandler {
           this.sendError(ws, `Unknown command type: ${message}`);
       }
     } catch (error) {
-      console.error('Error handling message:', error);
       this.sendError(ws, error instanceof Error ? error.message : 'Unknown error');
     }
   }
@@ -128,7 +127,6 @@ export class MessageHandler implements IMessageHandler {
         this.notificationService.updateRooms();
       }
     } catch (error) {
-      console.error('Error adding user to room:', error);
       this.sendError(ws, error instanceof Error ? error.message : 'Failed to join room');
     }
   }
@@ -140,8 +138,10 @@ export class MessageHandler implements IMessageHandler {
     : message.data;
 
     const {gameId, ships, indexPlayer} = requestData;
+
     try {
       this.gameService.addShips(gameId, indexPlayer, ships);
+
       const game = this.gameService.getGameById(gameId);
       if (game && this.gameService.isGameReady(gameId)) {
         game.playerIds.forEach(playerId => {
@@ -166,9 +166,36 @@ export class MessageHandler implements IMessageHandler {
             id: 0
           });
         });
+        if (game.playerIds.includes(-1) && game.currentPlayer === -1) {
+          setTimeout(() => this.makeBotMove(gameId), 1000);
+        }
       }
     } catch (error) {
       this.sendError(ws, error instanceof Error ? error.message : 'Failed to add ships');
+    }
+  }
+
+
+  private makeBotMove(gameId: number): void {
+    try {
+      const game = this.gameService.getGameById(gameId);
+      if (!game || game.currentPlayer !== -1) return;
+      
+      const {x, y} = this.gameService.randomAttack(gameId, -1);
+      
+      const attackMessage: AttackRequest = {
+        type: 'attack',
+        data: {
+          gameId,
+          x,
+          y,
+          indexPlayer: -1
+        },
+        id: 0
+      };
+      this.handleAttack({} as WebSocket, attackMessage);
+    } catch (error) {
+      console.error('Error making bot move:', error);
     }
   }
 
@@ -179,42 +206,149 @@ export class MessageHandler implements IMessageHandler {
       this.sendError(ws, 'Player not registered');
       return;
     }
-    
-    const game = this.gameService.createSinglePlayerGame(player.index);
 
-    this.sendResponse(ws, 'create_game', {
-      idGame: game.idGame,
-      idPlayer: player.index
-    })
+    try {
+      const game = this.gameService.createSinglePlayerGame(player.index);
+      this.addBotShips(game.idGame, -1);
+  
+      this.sendResponse(ws, 'create_game', {
+        idGame: game.idGame,
+        idPlayer: player.index
+      })
+    } catch (error) {
+      this.sendError(ws, error instanceof Error ? error.message : 'Failed to create single player game');
+    }
+  }
+
+  private addBotShips(gameId: number, botIndex: number): void {
+    const ships = this.generateRandomShips();
+    
+    try {
+        this.gameService.addShips(gameId, botIndex, ships);
+      } catch (error) {
+        console.error('Error adding bot ships:', error);
+      }
+    }
+  
+  
+    private generateRandomShips(): Ship[] {
+    const shipTypes = [
+      { type: 'huge' as const, length: 4 },
+      { type: 'large' as const, length: 3 },
+      { type: 'large' as const, length: 3 },
+      { type: 'medium' as const, length: 2 },
+      { type: 'medium' as const, length: 2 },
+      { type: 'medium' as const, length: 2 },
+      { type: 'small' as const, length: 1 },
+      { type: 'small' as const, length: 1 },
+      { type: 'small' as const, length: 1 },
+      { type: 'small' as const, length: 1 }
+    ];
+  
+    const ships: Ship[] = [];
+    const occupied = new Set<string>();
+  
+    shipTypes.forEach(shipType => {
+      let placed = false;
+      let attempts = 0;
+      
+      while (!placed && attempts < 100) {
+        attempts++;
+        const direction = Math.random() > 0.5;
+        const x = Math.floor(Math.random() * (direction ? 10 : (10 - shipType.length)));
+        const y = Math.floor(Math.random() * (direction ? (10 - shipType.length) : 10));
+        
+        let canPlace = true;
+        const positions: {x: number, y: number}[] = [];
+        
+        for (let i = 0; i < shipType.length; i++) {
+          const posX = direction ? x : x + i;
+          const posY = direction ? y + i : y;
+          const key = `${posX},${posY}`;
+          
+          if (posX < 0 || posX >= 10 || posY < 0 || posY >= 10 || occupied.has(key)) {
+            canPlace = false;
+            break;
+          }
+          
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const neighborX = posX + dx;
+              const neighborY = posY + dy;
+              if (neighborX >= 0 && neighborX < 10 && neighborY >= 0 && neighborY < 10) {
+                const neighborKey = `${neighborX},${neighborY}`;
+                if (occupied.has(neighborKey)) {
+                  canPlace = false;
+                  break;
+                }
+              }
+            }
+            if (!canPlace) break;
+          }
+          
+          positions.push({x: posX, y: posY});
+        }
+        
+        if (canPlace) {
+          positions.forEach(pos => {
+            occupied.add(`${pos.x},${pos.y}`);
+          });
+          
+          ships.push({
+            position: { x, y },
+            direction,
+            length: shipType.length,
+            type: shipType.type
+          });
+          
+          placed = true;
+        }
+      }
+    });
+    return ships;
   }
 
   private handleAttack(ws: WebSocket, message: AttackRequest): void {
-    const {gameId, x, y, indexPlayer} = message.data;
+    const requestData = typeof message.data === 'string' 
+    ? JSON.parse(message.data) 
+    : message.data;
+
+    const {gameId, x, y, indexPlayer} = requestData;
+
     try {
       const result = this.gameService.attack(gameId, indexPlayer, x, y);
       const game = this.gameService.getGameById(gameId);
+
       if (game) {
         game.playerIds.forEach(playerId => {
-          this.notificationService.sendToPlayer(playerId, {
-            type: 'attack',
-            data: JSON.stringify({
-              position: {x, y},
-              currentPlayer: indexPlayer,
-              status: result.status
-            }),
-            id: 0
-          });
-        });
-        if (result.nextPlayer !== undefined) {
-          game.playerIds.forEach(playerId => {
+          if (playerId !== -1) {
             this.notificationService.sendToPlayer(playerId, {
-              type: 'turn',
+              type: 'attack',
               data: JSON.stringify({
-                currentPlayer: result.nextPlayer
+                position: {x, y},
+                currentPlayer: indexPlayer,
+                status: result.status
               }),
               id: 0
             });
+          }
+        });
+
+        if (result.nextPlayer !== undefined) {
+          game.playerIds.forEach(playerId => {              
+            if (playerId !== -1) {
+              this.notificationService.sendToPlayer(playerId, {
+                type: 'turn',
+                data: JSON.stringify({
+                  currentPlayer: result.nextPlayer
+                }),
+                id: 0
+              });
+            }
           });
+          if (result.nextPlayer === -1) {
+            this.makeBotMove(gameId);
+          }
         }
 
         const opponentId = game.playerIds.find(id => id !== indexPlayer);
@@ -223,37 +357,55 @@ export class MessageHandler implements IMessageHandler {
           if (opponent && opponent.ships.every(ship => this.gameService['isShipKilled'](ship, opponent.attacks))) {
             this.winnerService.addWin(`${indexPlayer}`);
             this.notificationService.updateWinners();
+
             game.playerIds.forEach(playerId => {
-              this.notificationService.sendToPlayer(playerId, {
-                type: 'finish',
-                data: JSON.stringify({
-                  winPlayer: indexPlayer
-                }),
-                id: 0
-              });
+              if (playerId !== -1) {
+                this.notificationService.sendToPlayer(playerId, {
+                  type: 'finish',
+                  data: JSON.stringify({
+                    winPlayer: indexPlayer
+                  }),
+                  id: 0
+                });
+              }
             });
+            this.gameService.removeGame(gameId);
           }
         } 
       }
     } catch (error) {
-      this.sendError(ws, error instanceof Error ? error.message : 'Attack failed');
+      if (indexPlayer !== -1) {
+        this.sendError(ws, error instanceof Error ? error.message : 'Attack failed');
+      }
     }
   }
 
   private handleRandomAttack(ws: WebSocket, message: RandomAttackRequest): void {
-    const {gameId, indexPlayer} = message.data;
-    try {
-      const {x, y} = this.gameService.randomAttack(gameId, indexPlayer);
-      const attackMessage: AttackRequest = {
-        type: 'attack',
-        data: {gameId, x, y, indexPlayer},
-        id: 0
-      };
-      this.handleAttack(ws, attackMessage);
-    } catch (error) {
-      this.sendError(ws, error instanceof Error ? error.message : 'Random attack failed');
-    }
+  const requestData = typeof message.data === 'string' 
+    ? JSON.parse(message.data) 
+    : message.data;
+
+  const { gameId, indexPlayer } = requestData;
+
+  try {
+    const {x, y} = this.gameService.randomAttack(gameId, indexPlayer);
+    
+    const attackMessage: AttackRequest = {
+      type: 'attack',
+      data: {
+        gameId,
+        x, 
+        y,
+        indexPlayer
+      },
+      id: 0
+    };
+    
+    this.handleAttack(ws, attackMessage);
+  } catch (error) {
+    this.sendError(ws, error instanceof Error ? error.message : 'Random attack failed');
   }
+}
   
   private sendResponse(ws: WebSocket, type: string, data: any): void {
     const response = {
