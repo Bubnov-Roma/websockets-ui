@@ -60,7 +60,6 @@ export class GameService implements IGameService {
         attacks: new Set()
       });
     }
-
     this.games.set(game.idGame, game);
     return game;
   }
@@ -133,7 +132,8 @@ export class GameService implements IGameService {
       game.currentPlayer = opponentId;
       nextPlayer = opponentId;
     } else {
-      nextPlayer = opponentId;
+      game.currentPlayer = attackerIndex;
+      nextPlayer = attackerIndex;
     }
     
     return { status, nextPlayer };

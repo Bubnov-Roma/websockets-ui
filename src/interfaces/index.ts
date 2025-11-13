@@ -50,3 +50,8 @@ export interface INotificationService {
   sendToPlayer(playerIndex: number, message: any): void;
   broadcast(message: any): void;
 }
+export interface IBotService {
+  generateRandomShips(): Ship[];
+  makeBotMove(gameId: number): Promise<void>;
+  addBotShips(gameId: number): void;
+}

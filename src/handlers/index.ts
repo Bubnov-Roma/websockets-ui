@@ -1,5 +1,5 @@
-import { IGameService, IMessageHandler, INotificationService, IPlayerService, IRoomService, IWinnerService } from "../interfaces";
-import { AddShipsRequest, AddUserToRoomRequest, AttackRequest, RandomAttackRequest, RegRequest, Ship, WSRequest } from "../types";
+import { IBotService, IGameService, IMessageHandler, INotificationService, IPlayerService, IRoomService, IWinnerService } from "../interfaces";
+import { AddShipsRequest, AddUserToRoomRequest, AttackRequest, RandomAttackRequest, RegRequest, WSRequest } from "../types";
 import { WebSocket } from 'ws';
 
 export class MessageHandler implements IMessageHandler {
@@ -8,7 +8,8 @@ export class MessageHandler implements IMessageHandler {
     private roomService: IRoomService,
     private gameService: IGameService,
     private winnerService: IWinnerService,
-    private notificationService: INotificationService
+    private notificationService: INotificationService,
+    private botService: IBotService
   ) {}
 
   handleMessage(ws: WebSocket, message: WSRequest): void {
@@ -44,7 +45,6 @@ export class MessageHandler implements IMessageHandler {
   }
 
   private handleRegistration(ws: WebSocket, message: RegRequest): void {
-    
     try {
       const requestData = typeof message.data === 'string' 
       ? JSON.parse(message.data) 
@@ -146,8 +146,7 @@ export class MessageHandler implements IMessageHandler {
     }
   }
 
-  private handleAddShips(ws: WebSocket, message: AddShipsRequest): void {
-  
+  private async handleAddShips(ws: WebSocket, message: AddShipsRequest): Promise<void> {
   const requestData = typeof message.data === 'string' 
     ? JSON.parse(message.data) 
     : message.data;
@@ -156,33 +155,37 @@ export class MessageHandler implements IMessageHandler {
 
     try {
       this.gameService.addShips(gameId, indexPlayer, ships);
-
       const game = this.gameService.getGameById(gameId);
+
       if (game && this.gameService.isGameReady(gameId)) {
         game.playerIds.forEach(playerId => {
-          const playerData = game.players.get(playerId);
-          if (playerData) {
-            this.notificationService.sendToPlayer(playerId, {
-            type: 'start_game',
-            data: JSON.stringify({
-              ships: playerData.ships,
-              currentPlayerIndex: playerId
-            }),
-            id: 0
-          });
+          if (playerId !== -1) {
+            const playerData = game.players.get(playerId);
+              if (playerData) {
+                this.notificationService.sendToPlayer(playerId, {
+                type: 'start_game',
+                data: JSON.stringify({
+                  ships: playerData.ships,
+                  currentPlayerIndex: playerId
+                }),
+                id: 0
+              });
+            }
           }
         });
         game.playerIds.forEach(playerId => {
-          this.notificationService.sendToPlayer(playerId, {
-            type: 'turn',
-            data: JSON.stringify({
-              currentPlayer: game.currentPlayer
-            }),
-            id: 0
-          });
+          if (playerId !== -1) {
+            this.notificationService.sendToPlayer(playerId, {
+              type: 'turn',
+              data: JSON.stringify({
+                currentPlayer: game.currentPlayer
+              }),
+              id: 0
+            });
+          }
         });
         if (game.playerIds.includes(-1) && game.currentPlayer === -1) {
-          setTimeout(() => this.makeBotMove(gameId), 1000);
+          await this.botService.makeBotMove(gameId);
         }
       }
     } catch (error) {
@@ -190,41 +193,17 @@ export class MessageHandler implements IMessageHandler {
     }
   }
 
-
-  private makeBotMove(gameId: number): void {
-    try {
-      const game = this.gameService.getGameById(gameId);
-      if (!game || game.currentPlayer !== -1) return;
-      
-      const {x, y} = this.gameService.randomAttack(gameId, -1);
-      
-      const attackMessage: AttackRequest = {
-        type: 'attack',
-        data: {
-          gameId,
-          x,
-          y,
-          indexPlayer: -1
-        },
-        id: 0
-      };
-      this.handleAttack({} as WebSocket, attackMessage);
-    } catch (error) {
-      console.error('Error making bot move:', error);
-    }
-  }
-
   private handleSinglePlay(ws: WebSocket): void {
     const player = this.playerService.getPlayerBySocket(ws);
-
-    if(!player) {
+    if (!player) {
       this.sendError(ws, 'Player not registered');
       return;
     }
 
     try {
       const game = this.gameService.createSinglePlayerGame(player.index);
-      this.addBotShips(game.idGame, -1);
+
+      this.botService.addBotShips(game.idGame);
   
       this.sendResponse(ws, 'create_game', {
         idGame: game.idGame,
@@ -235,95 +214,7 @@ export class MessageHandler implements IMessageHandler {
     }
   }
 
-  private addBotShips(gameId: number, botIndex: number): void {
-    const ships = this.generateRandomShips();
-    
-    try {
-        this.gameService.addShips(gameId, botIndex, ships);
-      } catch (error) {
-        console.error('Error adding bot ships:', error);
-      }
-    }
-  
-  
-    private generateRandomShips(): Ship[] {
-    const shipTypes = [
-      { type: 'huge' as const, length: 4 },
-      { type: 'large' as const, length: 3 },
-      { type: 'large' as const, length: 3 },
-      { type: 'medium' as const, length: 2 },
-      { type: 'medium' as const, length: 2 },
-      { type: 'medium' as const, length: 2 },
-      { type: 'small' as const, length: 1 },
-      { type: 'small' as const, length: 1 },
-      { type: 'small' as const, length: 1 },
-      { type: 'small' as const, length: 1 }
-    ];
-  
-    const ships: Ship[] = [];
-    const occupied = new Set<string>();
-  
-    shipTypes.forEach(shipType => {
-      let placed = false;
-      let attempts = 0;
-      
-      while (!placed && attempts < 100) {
-        attempts++;
-        const direction = Math.random() > 0.5;
-        const x = Math.floor(Math.random() * (direction ? 10 : (10 - shipType.length)));
-        const y = Math.floor(Math.random() * (direction ? (10 - shipType.length) : 10));
-        
-        let canPlace = true;
-        const positions: {x: number, y: number}[] = [];
-        
-        for (let i = 0; i < shipType.length; i++) {
-          const posX = direction ? x : x + i;
-          const posY = direction ? y + i : y;
-          const key = `${posX},${posY}`;
-          
-          if (posX < 0 || posX >= 10 || posY < 0 || posY >= 10 || occupied.has(key)) {
-            canPlace = false;
-            break;
-          }
-          
-          for (let dx = -1; dx <= 1; dx++) {
-            for (let dy = -1; dy <= 1; dy++) {
-              const neighborX = posX + dx;
-              const neighborY = posY + dy;
-              if (neighborX >= 0 && neighborX < 10 && neighborY >= 0 && neighborY < 10) {
-                const neighborKey = `${neighborX},${neighborY}`;
-                if (occupied.has(neighborKey)) {
-                  canPlace = false;
-                  break;
-                }
-              }
-            }
-            if (!canPlace) break;
-          }
-          
-          positions.push({x: posX, y: posY});
-        }
-        
-        if (canPlace) {
-          positions.forEach(pos => {
-            occupied.add(`${pos.x},${pos.y}`);
-          });
-          
-          ships.push({
-            position: { x, y },
-            direction,
-            length: shipType.length,
-            type: shipType.type
-          });
-          
-          placed = true;
-        }
-      }
-    });
-    return ships;
-  }
-
-  private handleAttack(ws: WebSocket, message: AttackRequest): void {
+  private async handleAttack(ws: WebSocket, message: AttackRequest): Promise<void> {
     const requestData = typeof message.data === 'string' 
     ? JSON.parse(message.data) 
     : message.data;
@@ -387,7 +278,7 @@ export class MessageHandler implements IMessageHandler {
             }
           });
           if (result.nextPlayer === -1) {
-            this.makeBotMove(gameId);
+            await this.botService.makeBotMove(gameId);
           }
         }
       }
@@ -400,31 +291,31 @@ export class MessageHandler implements IMessageHandler {
   }
 
   private handleRandomAttack(ws: WebSocket, message: RandomAttackRequest): void {
-  const requestData = typeof message.data === 'string' 
-    ? JSON.parse(message.data) 
-    : message.data;
-
-  const { gameId, indexPlayer } = requestData;
-
-  try {
-    const {x, y} = this.gameService.randomAttack(gameId, indexPlayer);
-    
-    const attackMessage: AttackRequest = {
-      type: 'attack',
-      data: {
-        gameId,
-        x, 
-        y,
-        indexPlayer
-      },
-      id: 0
-    };
-    
-    this.handleAttack(ws, attackMessage);
-  } catch (error) {
-    this.sendError(ws, error instanceof Error ? error.message : 'Random attack failed');
+    const requestData = typeof message.data === 'string' 
+      ? JSON.parse(message.data) 
+      : message.data;
+  
+    const { gameId, indexPlayer } = requestData;
+  
+    try {
+      const {x, y} = this.gameService.randomAttack(gameId, indexPlayer);
+      
+      const attackMessage: AttackRequest = {
+        type: 'attack',
+        data: {
+          gameId,
+          x, 
+          y,
+          indexPlayer
+        },
+        id: 0
+      };
+      
+      this.handleAttack(ws, attackMessage);
+    } catch (error) {
+      this.sendError(ws, error instanceof Error ? error.message : 'Random attack failed');
+    }
   }
-}
   
   private sendResponse(ws: WebSocket, type: string, data: any): void {
     const response = {

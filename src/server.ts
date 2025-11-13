@@ -1,6 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { httpServer } from './http_server';
-import { PlayerService, RoomService, GameService, NotificationService, WinnerService } from './services';
+import { PlayerService, RoomService, GameService, NotificationService, WinnerService, BotService } from './services';
 import { WSRequest } from './types';
 import { MessageHandler } from './handlers';
 
@@ -16,13 +16,15 @@ const notificationService = new NotificationService(
   roomService,
   winnerService
 );
+const botService = new BotService(gameService, notificationService);
 
 const messageHandler = new MessageHandler(
   playerService,
   roomService,
   gameService,
   winnerService,
-  notificationService
+  notificationService,
+  botService
 );
 
 const wss = new WebSocketServer({ port: WS_PORT });
