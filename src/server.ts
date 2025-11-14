@@ -29,19 +29,57 @@ const messageHandler = new MessageHandler(
 
 const wss = new WebSocketServer({ port: WS_PORT });
 
-console.log(`WebSocket server is running on ws://localhost:${WS_PORT}`);
+console.log(`🚀 WebSocket server is running on ws://localhost:${WS_PORT}`);
+
+let isShuttingDown = false;
+
+const shutdown = () => {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  console.log('\n🛑 Shutting down servers...');
+
+  const forceExitTimer = setTimeout(() => {
+    console.log('🛑 Forcing exit...');
+    process.exit(1);
+  }, 5000);
+
+  const cleanup = () => {
+    clearTimeout(forceExitTimer);
+  };
+  
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.close();
+    }
+  });
+
+  wss.close(() => {
+    console.log('✅ WebSocket server closed');
+    cleanup();
+    httpServer.close(() => {
+      console.log('✅ HTTP server closed');
+      console.log('👋 Server shutdown complete');
+      process.exit(0);
+    });
+  });
+};
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 wss.on('connection', (ws) => {
-  console.log('New client connected');
+  console.log('🎮 New client connected');
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received:', data);
-
+      console.log('📨 Received:', data);
       messageHandler.handleMessage(ws, data);
     } catch (error) {
-      console.error('Error parsing message:', error);
+      console.error('❌ ', error);
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'error',
@@ -56,7 +94,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected');
+    console.log('🔌 Client disconnected');
     const player = playerService.getPlayerBySocket(ws);
     if (player) {
       roomService.removePlayerFromRooms(player.index);
@@ -65,9 +103,9 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+    console.error('❌ WebSocket error:', error);
   });
 });
 
-console.log(`Start static http server on the http://localhost:${HTTP_PORT} port!`);
+console.log(`🌐 HTTP server is running on http://localhost:${HTTP_PORT}`);
 httpServer.listen(HTTP_PORT);

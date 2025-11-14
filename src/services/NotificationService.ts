@@ -22,7 +22,6 @@ export class NotificationService implements INotificationService {
       data: JSON.stringify(formattedRooms),
       id: 0
     };
-    
     this.broadcast(message);
   }
 
@@ -33,18 +32,19 @@ export class NotificationService implements INotificationService {
       data: JSON.stringify(winnersData),
       id: 0
     };
-    
     this.broadcast(message);
   }
 
   sendToPlayer(playerIndex: number, message: WSMessage): void {
     const player = this.playerService.getPlayerByIndex(playerIndex);
     if (player && player.socket.readyState === WebSocket.OPEN) {
+      console.log(`📤 Sending to ${player.index}:`, message);
       player.socket.send(JSON.stringify(message));
     }
   }
 
   broadcast(message: WSMessage): void {
+    console.log('📢 Broadcasting:', message);
     this.playerService.getAllPlayers().forEach(player => {
       if (player.socket.readyState === WebSocket.OPEN) {
         player.socket.send(JSON.stringify(message));
