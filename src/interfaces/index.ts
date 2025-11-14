@@ -22,7 +22,7 @@ export interface IGameService {
   createGame(room: Room): Game;
   addShips(gameId: number, playerIndex: number, ships: Ship[]): void;
   attack(gameId: number, attackerIndex: number, x: number, y: number): {
-    status: 'miss' | 'shot' | 'killed' | 'already_attacked', 
+    status: 'miss' | 'shot' | 'killed' | 'already_attacked' | 'not_your_turn', 
     nextPlayer?: number,
     killedShip?: Ship | null,
     additionalAttacks?: Array<{x: number, y: number, status: 'miss'}>

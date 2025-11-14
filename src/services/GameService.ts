@@ -80,7 +80,7 @@ export class GameService implements IGameService {
   }
 
   attack(gameId: number, attackerIndex: number, x: number, y: number): { 
-    status: 'miss' | 'shot' | 'killed' | 'already_attacked', 
+    status: 'miss' | 'shot' | 'killed' | 'already_attacked' | 'not_your_turn', 
     nextPlayer?: number,
     killedShip?: Ship | null,
     additionalAttacks?: Array<{x: number, y: number, status: 'miss'}>
@@ -91,7 +91,7 @@ export class GameService implements IGameService {
     }
     
     if (game.currentPlayer !== attackerIndex) {
-      throw new Error('Not your turn');
+      return { status: 'not_your_turn' };
     }
     
     const opponentId = game.playerIds.find(id => id !== attackerIndex);
