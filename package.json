@@ -4,6 +4,10 @@
   "description": "Template for the WebSocket remote control task",
   "main": "index.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=24.10.0",
+    "npm": ">=10.9.0"
+  },
   "scripts": {
     "start": "ts-node src/server.ts",
     "start:dev": "nodemon --exec ts-node src/server.ts",
