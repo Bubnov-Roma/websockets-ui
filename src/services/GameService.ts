@@ -79,7 +79,12 @@ export class GameService implements IGameService {
     this.placeShipsOnBoard(player.board, ships);
   }
 
-  attack(gameId: number, attackerIndex: number, x: number, y: number): { status: 'miss' | 'shot' | 'killed', nextPlayer?: number } {
+  attack(gameId: number, attackerIndex: number, x: number, y: number): { 
+    status: 'miss' | 'shot' | 'killed' | 'already_attacked', 
+    nextPlayer?: number,
+    killedShip?: Ship | null,
+    additionalAttacks?: Array<{x: number, y: number, status: 'miss'}>
+  } {
     const game = this.games.get(gameId);
     if (!game) {
       throw new Error('Game not found');
@@ -101,18 +106,21 @@ export class GameService implements IGameService {
     
     const attackKey = `${x},${y}`;
     if (opponent.attacks.has(attackKey)) {
-      throw new Error('Cell already attacked');
+      return { status: 'already_attacked' };
     }
     
     opponent.attacks.add(attackKey);
     
     let status: 'miss' | 'shot' | 'killed' = 'miss';
     const shipHit = opponent.ships.find(ship => this.checkShipHit(ship, x, y));
+    let killedShip: Ship | null = null;
+    let additionalAttacks: Array<{x: number, y: number, status: 'miss'}> = [];
     
     if (shipHit) {
       if (this.isShipKilled(shipHit, opponent.attacks)) {
         status = 'killed';
-        this.markAroundShipAsMissed(shipHit, opponent.attacks);
+        killedShip = shipHit;
+        additionalAttacks = this.markAroundShipAsMissed(shipHit, opponent.attacks);
       } else {
         status = 'shot';
       }
@@ -125,7 +133,7 @@ export class GameService implements IGameService {
     );
 
     if (allShipsKilled) {
-      return { status, nextPlayer: undefined };
+      return { status, nextPlayer: undefined, killedShip, additionalAttacks };
     }
 
     if (status === 'miss') {
@@ -136,7 +144,7 @@ export class GameService implements IGameService {
       nextPlayer = attackerIndex;
     }
     
-    return { status, nextPlayer };
+    return { status, nextPlayer, killedShip, additionalAttacks };
   }
 
   randomAttack(gameId: number, attackerIndex: number): { x: number; y: number } {
@@ -235,8 +243,9 @@ export class GameService implements IGameService {
     return true;
   }
 
-  private markAroundShipAsMissed(ship: Ship, attacks: Set<string>): void {
+  private markAroundShipAsMissed(ship: Ship, attacks: Set<string>): Array<{x: number, y: number, status: 'miss'}> {
     const { position, direction, length } = ship;
+    const additionalAttacks: Array<{x: number, y: number, status: 'miss'}> = [];
     
     for (let i = -1; i <= length; i++) {
       for (let j = -1; j <= 1; j++) {
@@ -247,9 +256,11 @@ export class GameService implements IGameService {
           const attackKey = `${x},${y}`;
           if (!attacks.has(attackKey)) {
             attacks.add(attackKey);
+            additionalAttacks.push({ x, y, status: 'miss' });
           }
         }
       }
     }
+    return additionalAttacks;
   }
 }
